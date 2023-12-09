@@ -377,8 +377,6 @@ using Microsoft.EntityFrameworkCore;
 public abstract class ApplicationDbContext<TContext> : DbContext, IApplicationDbContext
     where TContext : DbContext, IApplicationDbContext
 {
-    private readonly IAuthenticatedUserService authenticatedUserService;
-
     protected ApplicationDbContext(DbContextOptions<TContext> options)
         : base(options)
     {
@@ -399,7 +397,7 @@ public abstract class ApplicationDbContext<TContext> : DbContext, IApplicationDb
     {
         base.OnConfiguring(optionsBuilder);
 
-        optionsBuilder.AddInterceptors(new DomainEventSaveChangesInterceptor<TContext>(this.authenticatedUserService));
+        optionsBuilder.AddInterceptors(new DomainEventSaveChangesInterceptor<TContext>());
     }
 
     protected abstract void ConfigureDatabaseModel(ModelBuilder modelBuilder);
