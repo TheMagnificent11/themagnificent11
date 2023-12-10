@@ -12,4 +12,4 @@ I don't have comments available on my blogs, but please send any feeback to my v
 
 ## Blogs
 
-* [9 December 2023](./_posts/2023-12-11-domain-event-dispatching-with-ef.md): Domain event dispatching using the outbox pattern with Entity Framework
+* [11 December 2023](_posts/2023-12-11-domain-event-dispatching-with-ef.md): Domain event dispatching using the outbox pattern with Entity Framework
