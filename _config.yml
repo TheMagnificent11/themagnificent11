@@ -1,1 +1,10 @@
 theme: jekyll-theme-midnight
+
+# title: TheMagnificent11
+# description: ".Net Blog site for the TheMagnificent11 GitHub user."
+# baseurl: "/TheMagnificent11"
+# github_username:  TheMagnificent11
+
+# relative_links:
+#   enabled:     true
+#   collections: true

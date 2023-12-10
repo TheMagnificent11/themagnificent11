@@ -1,4 +1,7 @@
-# Domain event dispatching using the outbox pattern with Entity Framework
+---
+layout: post
+title:  "Domain event dispatching using the outbox pattern with Entity Framework"
+---
 
 ## What is domain event dispatching?
 
