@@ -10,7 +10,7 @@ Now, I've not actually read Eric Evans' seminal book on domain-driven design, [D
 
 I prefer the outbox pattern for domain event dispatching because I don't think you want a scenario where data is persisted and an event is raised that has multiple subscribers, but one of the subscribers fails to execute, causing the whole transation to be rolled back.
 
-You then get an inconsistent scenario where certain event handlers have been handled, but the data that relates to those actions does not exist.
+You then get an inconsistent scenario where certain event handlers have been handled, but the data that relates to those actions does not exist.  Why send a confirmation email for an account that wasn't successfully regsitered.
 
 Or, conversely, the transaction is not rolled back and one subscriber has failed to execute (including retries with back-off).
 
@@ -73,7 +73,7 @@ public class MenuItemAddedToOrderDomainEvent : IDomainEvent
 
 Below is entity class used to store the details about a domain event after it related aggregate root has been persisted.
 
-Things to note, we are storing the domain event as JSON (`DomainEventJson`) and then storing the assembly name (`DomainEventAssemblyName`) and class name (`DomainEventClassName`) to allow us to deserialize the JSON back to the doamin event in the `ToDomainEvent` method.
+Things to note, we are storing the domain event as JSON (`DomainEventJson`) and also storing the assembly name (`DomainEventAssemblyName`) and class name (`DomainEventClassName`) to allow us to deserialize the JSON back to the doamin event in the `ToDomainEvent` method.
 
 ```cs
 using System.Reflection;
@@ -292,7 +292,6 @@ public class Table : AggregateRoot
 
     public static class ErrorMessages
     {
-        public const string TableInUse = "Table is already being used";
         public const string CannotOrderIfTableNotInUse = "Cannot order items if table is not in use";
     }
 }
@@ -379,7 +378,7 @@ public class DomainEventSaveChangesInterceptor<TContext> : SaveChangesIntercepto
 }
 ```
 
-Finally, here's abstract `DbContext` implementation that exposes the `DomainEventReference` `DbSet` and adds the `DomainEventSaveChangesInterceptor`.
+Finally, here's an abstract `DbContext` implementation that exposes the `DomainEventReference` `DbSet` and adds the `DomainEventSaveChangesInterceptor`.
 
 ```cs
 using Microsoft.EntityFrameworkCore;
@@ -418,13 +417,11 @@ public abstract class ApplicationDbContext<TContext> : DbContext, IApplicationDb
 
 The code below reads from the database table for the `DomainEventReference` entity and dispatches them in batches of 50.
 
-For event row, it deserializes the JSON to the original `IDomainEvent` and because `IDomainEvent` implements `INotification` from `MediatR`, you can use the `Publish` functionality to achieve the publisher-subscriber pattern; there can be multiple notification handlers for each event.
-
-Conversely, if there are not notification handlers, `MediatR` will handle this for us and return successfully.
+For event row, it deserializes the JSON to the original `IDomainEvent` and because `IDomainEvent` implements `INotification` from `MediatR`, you can use the `Publish` to achieve the publisher-subscriber pattern; there can be multiple notification handlers for each event.  Conversely, if there are not notification handlers, `MediatR` will handle this for us and return successfully.
 
 The domain event does not get marked as "dispatched" in the database unless all dispatching succeeds.
 
-There is a downside here because you could have three notification handlers for an event, two could succeed and one could fail so the event does not get marked as dispatched.
+There is a downside here because you could have three notification handlers for an event, two could succeed and one could fail, causing the event does not get marked as dispatched.
 
 Any process that tries to re-dispatch will attempt all three handlers again, so you could get duplication of certain handlers.
 
@@ -434,8 +431,6 @@ However, I think this is still better than the other scenario I outlined earlier
 using MediatR;
 using Microsoft.EntityFrameworkCore;
 using Serilog;
-
-namespace Lewee.Infrastructure.Data;
 
 public class DomainEventDispatcher<TContext>
     where TContext : DbContext, IApplicationDbContext
@@ -548,7 +543,7 @@ So, any events that failed to dispatch will be retried after 2.5 seconds.
 
 `DomainEventReference` does not currently have a "retry count" or a "failed" property and that is definitely an improvement that could be added; fail if retried 10 times.
 
-Under this solution, we will keep retrying and failed events will be attempted before new events, potentially causing a performance issue.
+Under this solution, we will keep retrying and failed events will be attempted before new events, potentially causing a performance issue if failed events build up.
 
 ```cs
 using Microsoft.EntityFrameworkCore;
@@ -614,7 +609,7 @@ This seems like a lot of code to achieve what I'd expect to be relatively straig
 
 Given this is fairly common pattern and that DDD is used by a lot in software development, you'd expect that there are frameworks that do this for you.
 
-That's what I've tried to achieve with  [Lewee](https://github.com/TheMagnificent11/lewee).
+That's what I've tried to achieve with [Lewee](https://github.com/TheMagnificent11/lewee).
 
 However, there's definitely a better way.
 
