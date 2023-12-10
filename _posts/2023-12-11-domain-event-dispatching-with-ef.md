@@ -1,10 +1,20 @@
 # Domain event dispatching using the outbox pattern with Entity Framework
 
-Domain event dispatching is a concept that related to [domain-driven design](https://martinfowler.com/bliki/DomainDrivenDesign.html).
+## What is domain event dispatching?
+
+Domain event dispatching is a concept that related to [domain-driven design](https://martinfowler.com/bliki/DomainDrivenDesign.html), or DDD as it's also known.
 
 Having said that, event dispatching is central to any [event-driven architecture](https://learn.microsoft.com/en-us/azure/architecture/guide/architecture-styles/event-driven), which follows the [publisher-subscriber pattern](https://learn.microsoft.com/en-us/azure/architecture/patterns/publisher-subscriber).
 
 Now, I've not actually read Eric Evans' seminal book on domain-driven design, [Domain-driven Design: Tacking Complexity in the Heart of Software](https://www.amazon.com.au/Domain-Driven-Design-Tackling-Complexity-Software/dp/0321125215), so I'm unsure whether Evans suggests whether domain events should be published as part of the transaction that creates them, or have the event persisted with the change in application state and then later published using an [outbox pattern](https://codeopinion.com/outbox-pattern-reliably-save-state-publish-events).
+
+I prefer the outbox pattern for domain event dispatching because I don't think you want a scenario where data is persisted and an event is raised that has multiple subscribers, but one of the subscribers fails to execute, causing the whole transation to be rolled back.
+
+You then get an inconsistent scenario where certain event handlers have been handled, but the data that relates to those actions does not exist.
+
+Or, conversely, the transaction is not rolled back and one subscriber has failed to execute (including retries with back-off).
+
+The outbox pattern, keeps a record of whether the event has been dispatched or "sent", behaving a bit like a service bus.
 
 In this blog post, I'm going to explore how an application using [Entity Framework](https://learn.microsoft.com/en-us/aspnet/entity-framework) as an ORM can use an outbox pattern to publish domain events that are persisted with the application data.
 
@@ -405,3 +415,207 @@ public abstract class ApplicationDbContext<TContext> : DbContext, IApplicationDb
 ```
 
 ## Dispatching Domain Events
+
+The code below reads from the database table for the `DomainEventReference` entity and dispatches them in batches of 50.
+
+For event row, it deserializes the JSON to the original `IDomainEvent` and because `IDomainEvent` implements `INotification` from `MediatR`, you can use the `Publish` functionality to achieve the publisher-subscriber pattern; there can be multiple notification handlers for each event.
+
+Conversely, if there are not notification handlers, `MediatR` will handle this for us and return successfully.
+
+The domain event does not get marked as "dispatched" in the database unless all dispatching succeeds.
+
+There is a downside here because you could have three notification handlers for an event, two could succeed and one could fail so the event does not get marked as dispatched.
+
+Any process that tries to re-dispatch will attempt all three handlers again, so you could get duplication of certain handlers.
+
+However, I think this is still better than the other scenario I outlined earlier.
+
+```cs
+using MediatR;
+using Microsoft.EntityFrameworkCore;
+using Serilog;
+
+namespace Lewee.Infrastructure.Data;
+
+public class DomainEventDispatcher<TContext>
+    where TContext : DbContext, IApplicationDbContext
+{
+    private const int BatchSize = 50;
+
+    private readonly IDbContextFactory<TContext> dbContextFactory;
+    private readonly IMediator mediator;
+    private readonly ILogger logger;
+
+    public DomainEventDispatcher(
+        IDbContextFactory<TContext> dbContextFactory,
+        IMediator mediator,
+        ILogger logger)
+    {
+        this.dbContextFactory = dbContextFactory;
+        this.mediator = mediator;
+        this.logger = logger.ForContext<DomainEventDispatcher<TContext>>();
+    }
+
+    public async Task DispatchEvents(CancellationToken cancellationToken)
+    {
+        var eventsToDispatch = await this.ThereAreEventsToDispatch(cancellationToken);
+
+        while (eventsToDispatch && !cancellationToken.IsCancellationRequested)
+        {
+            await this.DispatchBatch(cancellationToken);
+
+            eventsToDispatch = await this.ThereAreEventsToDispatch(cancellationToken);
+        }
+    }
+
+    private async Task<bool> ThereAreEventsToDispatch(CancellationToken token)
+    {
+        using (var scope = this.dbContextFactory.CreateDbContext())
+        {
+            var dbSet = scope.Set<DomainEventReference>();
+
+            if (dbSet == null)
+            {
+                return false;
+            }
+
+            return await dbSet
+                .Where(x => !x.Dispatched)
+                .OrderBy(x => x.PersistedAt)
+                .AnyAsync(token);
+        }
+    }
+
+    private async Task DispatchBatch(CancellationToken token)
+    {
+        using (var scope = this.dbContextFactory.CreateDbContext())
+        {
+            var dbSet = scope.Set<DomainEventReference>();
+            if (dbSet == null)
+            {
+                return;
+            }
+
+            var events = await dbSet
+                .Where(x => !x.Dispatched)
+                .OrderBy(x => x.PersistedAt)
+                .Take(BatchSize)
+                .ToArrayAsync(token);
+
+            var domainEvents = new List<DomainEvent>();
+
+            foreach (var domainEventReference in events)
+            {
+                domainEventReference.Dispatch();
+
+                var domainEvent = domainEventReference.ToDomainEvent();
+
+                if (domainEvent == null)
+                {
+                    this.logger.Warning(
+                        "Could not deserialize DomainEventReference {Id}",
+                        domainEventReference.Id);
+                }
+                else
+                {
+                    domainEvents.Add(domainEvent);
+                }
+            }
+
+            if (domainEvents.Any())
+            {
+                foreach (var domainEvent in domainEvents)
+                {
+                    await this.mediator.Publish(domainEvent, token);
+                }
+            }
+
+            await scope.SaveChangesAsync(token);
+        }
+    }
+}
+```
+
+So the code above does the dispatching, but what triggers the dispatching?
+
+As far as I know, there is nothing similar to the `SaveChangesInterceptor` that executes after a successful save changes.
+
+So, we've decided to use a background service.
+
+In the code below, we are execting our `DomainEventDispatcher` event 2.5 seconds.
+
+So, any events that failed to dispatch will be retried after 2.5 seconds.
+
+`DomainEventReference` does not currently have a "retry count" or a "failed" property and that is definitely an improvement that could be added; fail if retried 10 times.
+
+Under this solution, we will keep retrying and failed events will be attempted before new events, potentially causing a performance issue.
+
+```cs
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Hosting;
+
+namespace Lewee.Infrastructure.Data;
+
+public class DomainEventDispatcherService<TContext> : BackgroundService
+    where TContext : DbContext, IApplicationDbContext
+{
+    public DomainEventDispatcherService(DomainEventDispatcher<TContext> domainEventDispatcher)
+    {
+        this.DomainEventDispatcher = domainEventDispatcher;
+    }
+
+    public DomainEventDispatcher<TContext> DomainEventDispatcher { get; }
+
+    protected override async Task ExecuteAsync(CancellationToken stoppingToken)
+    {
+        while (!stoppingToken.IsCancellationRequested)
+        {
+            await this.DomainEventDispatcher.DispatchEvents(stoppingToken);
+
+            await Task.Delay(2500, stoppingToken);
+        }
+    }
+}
+```
+
+There are definitely better ways to achieve this.
+
+You could override save changes on your `DbContext` to trigger your domain event dispatcher and later you use some sort of retry policy if any events fails to dispatch.
+
+That would be more efficient, but more complicated and harder to implement.
+
+## Dependency Injection Configuration
+
+```cs
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
+
+public static class ApplicationDbContextServiceCollectionExtensions
+{
+    public static IServiceCollection ConfigureDatabase<T>(
+        this IServiceCollection services,
+        string connectionString)
+        where T : ApplicationDbContext<T>
+    {
+        services.AddDbContextFactory<T>(options => options.UseSqlServer(connectionString));
+        services.AddScoped<T>();
+
+        services.AddSingleton<DomainEventDispatcher<T>>();
+        services.AddHostedService<DomainEventDispatcherService<T>>();
+
+        return services;
+    }
+}
+```
+
+## This is a lot of boilerplate
+
+This seems like a lot of code to achieve what I'd expect to be relatively straight-forward.
+
+Given this is fairly common pattern and that DDD is used by a lot in software development, you'd expect that there are frameworks that do this for you.
+
+That's what I've tried to achieve with  [Lewee](https://github.com/TheMagnificent11/lewee).
+
+However, there's definitely a better way.
+
+In a future blog post, I'd like to explore how to achieve something similar using [Wolverine](https://wolverine.netlify.app) and [Marten](https://martendb.io), instead of `MediatR` and Entity Framework.
