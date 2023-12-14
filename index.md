@@ -1,12 +1,12 @@
-# Saji's .Net Blog
+# TheMagnificent11
 
 Hi, welcome to my blog.
 
-Boring name, I know.  What's the [programming joke](https://martinfowler.com/bliki/TwoHardThings.html); there are only two hard things in computer science: cache invalidation and naming things (Phil Karlton).
-
 I know it's a bit empty in here, but I'm new to this blogging caper.
 
-If you'd like to know more about me, my [GitHub profile](https://github.com/TheMagnificent11) has all the info I feel comfortable divluging.
+I plan to blog about my learnings and experiments with .Net.
+
+If you'd like to know more about me, my [GitHub profile](https://github.com/TheMagnificent11) has all the info I feel comfortable divulging.
 
 I don't have comments available on my blogs, but please send any feeback to my via any of the social media platforms listed on my [GitHub profile](https://github.com/TheMagnificent11).
 
@@ -22,11 +22,11 @@ Domain event dispatching is a concept that related to [domain-driven design](htt
 
 Having said that, event dispatching is central to any [event-driven architecture](https://learn.microsoft.com/en-us/azure/architecture/guide/architecture-styles/event-driven), which follows the [publisher-subscriber pattern](https://learn.microsoft.com/en-us/azure/architecture/patterns/publisher-subscriber).
 
-Now, I've not actually read Eric Evans' seminal book on domain-driven design, [Domain-driven Design: Tacking Complexity in the Heart of Software](https://www.amazon.com.au/Domain-Driven-Design-Tackling-Complexity-Software/dp/0321125215), so I'm unsure whether Evans suggests whether domain events should be published as part of the transaction that creates them, or have the event persisted with the change in application state and then later published using an [outbox pattern](https://codeopinion.com/outbox-pattern-reliably-save-state-publish-events).
+Now, I've not actually read Eric Evans' seminal book on domain-driven design, [Domain-driven Design: Tacking Complexity in the Heart of Software](https://www.amazon.com.au/Domain-Driven-Design-Tackling-Complexity-Software/dp/0321125215), so I'm unsure whether Evans suggests that domain events should be published as part of the transaction that creates them, or have the event persisted with the change in application state and then later published using an [outbox pattern](https://codeopinion.com/outbox-pattern-reliably-save-state-publish-events).
 
-I prefer the outbox pattern for domain event dispatching because I don't think you want a scenario where data is persisted and an event is raised that has multiple subscribers, but one of the subscribers fails to execute, causing the whole transation to be rolled back.
+I prefer the outbox pattern for domain event dispatching because I don't think you want a scenario where data is persisted and an event is raised that has multiple subscribers, but one of the subscribers fails to execute causing the whole transaction to be rolled-back.
 
-You then get an inconsistent scenario where certain event handlers have been handled, but the data that relates to those actions does not exist.  Why send a confirmation email for an account that wasn't successfully regsitered.
+You then get an inconsistent scenario where certain event handlers have been handled, but the data that relates to those actions does not exist.  Why send a confirmation email for an account that wasn't successfully registered.
 
 Or, conversely, the transaction is not rolled back and one subscriber has failed to execute (including retries with back-off).
 
@@ -34,7 +34,7 @@ The outbox pattern, keeps a record of whether the event has been dispatched or "
 
 In this blog post, I'm going to explore how an application using [Entity Framework](https://learn.microsoft.com/en-us/aspnet/entity-framework) as an ORM can use an outbox pattern to publish domain events that are persisted with the application data.
 
-The packages used will be Entity Framewok and I will leverage `INotification` in [MediatR](https://github.com/jbogard/MediatR) to assist with the publisher-subscriber implementation.
+The packages used will be Entity Framework and I will leverage `INotification` in [MediatR](https://github.com/jbogard/MediatR) to assist with the publisher-subscriber implementation.
 
 All of these code samples are taken from my [Lewee](https://github.com/TheMagnificent11/lewee) project.
 
@@ -53,7 +53,7 @@ public interface IDomainEvent : INotification
 }
 ```
 
-And here's a sample implementation of an menu item being added to the table's order at a restaurant.
+And here's a sample implementation of a menu item being added to the table's order at a restaurant.
 
 ```cs
 public class MenuItemAddedToOrderDomainEvent : IDomainEvent
@@ -89,7 +89,7 @@ public class MenuItemAddedToOrderDomainEvent : IDomainEvent
 
 Below is entity class used to store the details about a domain event after it related aggregate root has been persisted.
 
-Things to note, we are storing the domain event as JSON (`DomainEventJson`) and also storing the assembly name (`DomainEventAssemblyName`) and class name (`DomainEventClassName`) to allow us to deserialize the JSON back to the doamin event in the `ToDomainEvent` method.
+Things to note, we are storing the domain event as JSON (`DomainEventJson`) and also storing the assembly name (`DomainEventAssemblyName`) and class name (`DomainEventClassName`) to allow us to deserialize the JSON back to the domain event in the `ToDomainEvent` method.
 
 ```cs
 using System.Reflection;
