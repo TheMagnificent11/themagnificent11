@@ -1,9 +1,18 @@
 <Project Sdk="Microsoft.NET.Sdk.BlazorWebAssembly">
 
 	<ItemGroup>
+	  <None Remove="Pages\index.md" />
+	</ItemGroup>
+
+	<ItemGroup>
+	  <EmbeddedResource Include="Pages\index.md" />
+	</ItemGroup>
+
+	<ItemGroup>
 		<PackageReference Include="Microsoft.AspNetCore.Components.WebAssembly" />
 		<PackageReference Include="Microsoft.AspNetCore.Components.WebAssembly.DevServer" PrivateAssets="all" />
 		<PackageReference Include="MudBlazor" />
+		<PackageReference Include="MudBlazor.Markdown" />
 	</ItemGroup>
 	
 </Project>

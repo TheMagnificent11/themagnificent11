@@ -1,8 +1,3 @@
-<!-- ---
-layout: home
-title: TheMagnificent11
---- -->
-
 # TheMagnificent11
 
 Hi, welcome to my blog.
@@ -13,7 +8,7 @@ I plan to blog about my learnings and experiments with .Net.
 
 If you'd like to know more about me, my [GitHub profile](https://github.com/TheMagnificent11) has all the info I feel comfortable divulging.
 
-I don't have comments available on my blogs, but please send any feeback to my via any of the social media platforms listed on my [GitHub profile](https://github.com/TheMagnificent11).
+I don't have comments available on my blogs, but please send any feedback to my via any of the social media platforms listed on my [GitHub profile](https://github.com/TheMagnificent11).
 
 ## 11-Dec-23 Domain event dispatching using the outbox pattern with Entity Framework
 
@@ -35,7 +30,7 @@ The outbox pattern, keeps a record of whether the event has been dispatched or "
 
 In this blog post, I'm going to explore how an application using [Entity Framework](https://learn.microsoft.com/en-us/aspnet/entity-framework) as an ORM can use an outbox pattern to publish domain events that are persisted with the application data.
 
-The packages used will be Entity Framewok and I will leverage `INotification` in [MediatR](https://github.com/jbogard/MediatR) to assist with the publisher-subscriber implementation.
+The packages used will be Entity Framework and I will leverage `INotification` in [MediatR](https://github.com/jbogard/MediatR) to assist with the publisher-subscriber implementation.
 
 All of these code samples are taken from my [Lewee](https://github.com/TheMagnificent11/lewee) project.
 
