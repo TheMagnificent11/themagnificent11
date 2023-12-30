@@ -1,23 +1,8 @@
-<!-- ---
-layout: home
-title: TheMagnificent11
---- -->
+### Domain event dispatching using the outbox pattern with Entity Framework
 
-# TheMagnificent11
+_11 December 2023_
 
-Hi, welcome to my blog.
-
-I know it's a bit empty in here, but I'm new to this blogging caper.
-
-I plan to blog about my learnings and experiments with .Net.
-
-If you'd like to know more about me, my [GitHub profile](https://github.com/TheMagnificent11) has all the info I feel comfortable divulging.
-
-I don't have comments available on my blogs, but please send any feeback to my via any of the social media platforms listed on my [GitHub profile](https://github.com/TheMagnificent11).
-
-## 11-Dec-23 Domain event dispatching using the outbox pattern with Entity Framework
-
-### What is domain event dispatching?
+#### What is domain event dispatching?
 
 Domain event dispatching is a concept that related to [domain-driven design](https://martinfowler.com/bliki/DomainDrivenDesign.html), or DDD as it's also known.
 
@@ -35,11 +20,11 @@ The outbox pattern, keeps a record of whether the event has been dispatched or "
 
 In this blog post, I'm going to explore how an application using [Entity Framework](https://learn.microsoft.com/en-us/aspnet/entity-framework) as an ORM can use an outbox pattern to publish domain events that are persisted with the application data.
 
-The packages used will be Entity Framewok and I will leverage `INotification` in [MediatR](https://github.com/jbogard/MediatR) to assist with the publisher-subscriber implementation.
+The packages used will be Entity Framework and I will leverage `INotification` in [MediatR](https://github.com/jbogard/MediatR) to assist with the publisher-subscriber implementation.
 
 All of these code samples are taken from my [Lewee](https://github.com/TheMagnificent11/lewee) project.
 
-### Domain Event
+#### Domain Event
 
 Here's rough representation of a domain event.
 
@@ -84,7 +69,7 @@ public class MenuItemAddedToOrderDomainEvent : IDomainEvent
 }
 ```
 
-### Storing Domain Events
+#### Storing Domain Events
 
 Below is entity class used to store the details about a domain event after it related aggregate root has been persisted.
 
@@ -424,7 +409,7 @@ public abstract class ApplicationDbContext<TContext> : DbContext, IApplicationDb
 }
 ```
 
-### Dispatching Domain Events
+#### Dispatching Domain Events
 
 The code below reads from the database table for the `DomainEventReference` entity and dispatches them in batches of 50.
 
@@ -560,8 +545,6 @@ Under this solution, we will keep retrying and failed events will be attempted b
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Hosting;
 
-namespace Lewee.Infrastructure.Data;
-
 public class DomainEventDispatcherService<TContext> : BackgroundService
     where TContext : DbContext, IApplicationDbContext
 {
@@ -590,7 +573,7 @@ You could override save changes on your `DbContext` to trigger your domain event
 
 That would be more efficient, but more complicated and harder to implement.
 
-### Dependency Injection Configuration
+#### Dependency Injection Configuration
 
 ```cs
 using Microsoft.EntityFrameworkCore;
@@ -625,5 +608,3 @@ That's what I've tried to achieve with [Lewee](https://github.com/TheMagnificent
 However, there's definitely a better way.
 
 In a future blog post, I'd like to explore how to achieve something similar using [Wolverine](https://wolverine.netlify.app) and [Marten](https://martendb.io), instead of `MediatR` and Entity Framework.
-
-<!-- [11 December 2023]({{ site.baseurl }}{% post_url 2023-12-11-outbox-domain-event-dispatching-with-ef %}): Domain event dispatching using the outbox pattern with Entity Framework -->
