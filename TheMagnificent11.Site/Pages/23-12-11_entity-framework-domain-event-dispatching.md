@@ -608,5 +608,3 @@ That's what I've tried to achieve with [Lewee](https://github.com/TheMagnificent
 However, there's definitely a better way.
 
 In a future blog post, I'd like to explore how to achieve something similar using [Wolverine](https://wolverine.netlify.app) and [Marten](https://martendb.io), instead of `MediatR` and Entity Framework.
-
-<!-- [11 December 2023]({{ site.baseurl }}{% post_url 2023-12-11-outbox-domain-event-dispatching-with-ef %}): Domain event dispatching using the outbox pattern with Entity Framework -->
