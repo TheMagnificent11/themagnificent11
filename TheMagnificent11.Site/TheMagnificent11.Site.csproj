@@ -1,18 +1,15 @@
 <Project Sdk="Microsoft.NET.Sdk.BlazorWebAssembly">
 
 	<ItemGroup>
-	  <None Remove="Pages\index.md" />
-	</ItemGroup>
-
-	<ItemGroup>
-	  <EmbeddedResource Include="Pages\index.md" />
-	</ItemGroup>
-
-	<ItemGroup>
 		<PackageReference Include="Microsoft.AspNetCore.Components.WebAssembly" />
 		<PackageReference Include="Microsoft.AspNetCore.Components.WebAssembly.DevServer" PrivateAssets="all" />
 		<PackageReference Include="MudBlazor" />
 		<PackageReference Include="MudBlazor.Markdown" />
 	</ItemGroup>
+
+  <ItemGroup>
+    <EmbeddedResource Include="Pages\23-12-11_entity-framework-domain-event-dispatching.md" />
+    <EmbeddedResource Include="Pages\index.md" />
+  </ItemGroup>
 	
 </Project>
