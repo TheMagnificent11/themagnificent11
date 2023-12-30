@@ -1,3 +1,13 @@
 ﻿@page "/"
 
 <MudMarkdown Value="@MarkDownHelper.GetMarkdownFromEmbeddedResource("Pages.index.md")" />
+
+<MudText Typo="Typo.h4">Posts</MudText>
+
+<MudList>
+    <MudListItem>
+        <MudLink Href="/posts/23-12-11_entity-framework-domain-event-dispatching">
+            11 December 2023: Domain event dispatching using the outbox pattern with Entity Framework
+        </MudLink>
+    </MudListItem>
+</MudList>

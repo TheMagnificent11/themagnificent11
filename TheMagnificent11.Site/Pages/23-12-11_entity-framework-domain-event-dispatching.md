@@ -1,6 +1,8 @@
-## 11-Dec-23 Domain event dispatching using the outbox pattern with Entity Framework
+### Domain event dispatching using the outbox pattern with Entity Framework
 
-### What is domain event dispatching?
+_11 December 2023_
+
+#### What is domain event dispatching?
 
 Domain event dispatching is a concept that related to [domain-driven design](https://martinfowler.com/bliki/DomainDrivenDesign.html), or DDD as it's also known.
 
@@ -22,7 +24,7 @@ The packages used will be Entity Framework and I will leverage `INotification` i
 
 All of these code samples are taken from my [Lewee](https://github.com/TheMagnificent11/lewee) project.
 
-### Domain Event
+#### Domain Event
 
 Here's rough representation of a domain event.
 
@@ -67,7 +69,7 @@ public class MenuItemAddedToOrderDomainEvent : IDomainEvent
 }
 ```
 
-### Storing Domain Events
+#### Storing Domain Events
 
 Below is entity class used to store the details about a domain event after it related aggregate root has been persisted.
 
@@ -407,7 +409,7 @@ public abstract class ApplicationDbContext<TContext> : DbContext, IApplicationDb
 }
 ```
 
-### Dispatching Domain Events
+#### Dispatching Domain Events
 
 The code below reads from the database table for the `DomainEventReference` entity and dispatches them in batches of 50.
 
@@ -573,7 +575,7 @@ You could override save changes on your `DbContext` to trigger your domain event
 
 That would be more efficient, but more complicated and harder to implement.
 
-### Dependency Injection Configuration
+#### Dependency Injection Configuration
 
 ```cs
 using Microsoft.EntityFrameworkCore;
