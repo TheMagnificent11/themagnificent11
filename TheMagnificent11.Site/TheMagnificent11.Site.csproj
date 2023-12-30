@@ -1,5 +1,10 @@
 <Project Sdk="Microsoft.NET.Sdk.BlazorWebAssembly">
 
+  <PropertyGroup>
+    <PublishTrimmed>true</PublishTrimmed>
+    <BlazorEnableCompression>true</BlazorEnableCompression>
+  </PropertyGroup>
+
 	<ItemGroup>
 		<PackageReference Include="Microsoft.AspNetCore.Components.WebAssembly" />
 		<PackageReference Include="Microsoft.AspNetCore.Components.WebAssembly.DevServer" PrivateAssets="all" />
@@ -11,5 +16,5 @@
     <EmbeddedResource Include="Pages\23-12-11_entity-framework-domain-event-dispatching.md" />
     <EmbeddedResource Include="Pages\index.md" />
   </ItemGroup>
-	
+
 </Project>
