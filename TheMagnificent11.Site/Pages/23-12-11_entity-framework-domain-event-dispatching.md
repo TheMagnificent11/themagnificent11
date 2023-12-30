@@ -545,8 +545,6 @@ Under this solution, we will keep retrying and failed events will be attempted b
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Hosting;
 
-namespace Lewee.Infrastructure.Data;
-
 public class DomainEventDispatcherService<TContext> : BackgroundService
     where TContext : DbContext, IApplicationDbContext
 {
