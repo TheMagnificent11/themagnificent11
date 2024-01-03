@@ -10,7 +10,7 @@ I'm a father of two, partner to one.
 
 I enjoy watching football (soccer), but enjoy the analysis of games more than actually watching the games (maybe that's the engineer in me).
 
-My GitHub username, `TheMagnificcent11`, is play on words with the old "The Magnificent Seven" and my favourite football player at the time I signed up to GitHub, Ryan Giggs, who wore the number 11 shirt for Manchester United, which is my favourite football team.
+My GitHub username, `TheMagnificent11`, is play on words with the old "The Magnificent Seven" and my favourite football player at the time I signed up to GitHub, Ryan Giggs, who wore the number 11 shirt for Manchester United, which is my favourite football team.
 
 My main software engineering interests include domain-driven design and observability.
 
