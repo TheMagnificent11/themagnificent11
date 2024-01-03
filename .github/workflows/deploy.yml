@@ -31,3 +31,4 @@ jobs:
         with:
           branch: gh-pages
           folder: release/wwwroot
+          token: PUBLISH_TOKEN
