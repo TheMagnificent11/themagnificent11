@@ -1,0 +1,672 @@
+<!DOCTYPE html>
+<html>
+
+  <head>
+	<meta name="generator" content="Hugo 0.91.2" />
+
+  <title>
+      
+      Saji Weerasingham
+      
+  </title>
+
+</head>
+
+
+  <body>
+
+    
+
+	
+<div class="h-feed">
+
+	
+	
+	  <div class="h-entry">
+		
+
+		<a href="https://sajilicious.micro.blog/2025/02/20/good-history-lesson-on-australian.html" class="u-url"><time class="dt-published" datetime="2025-02-20 16:02:50 &#43;1000">Feb 20, 2025</time></a>
+
+		<div class="e-content">
+			 <p>Good history lesson on Australian interest rates and why things are so expensive.</p>
+<p>Spoiler, it&rsquo;s not a domestic issue.</p>
+<p>#auspol #costoflivingcrisis
+<a href="https://open.spotify.com/episode/0a94fRXCVwYmxInr7iBlOW?si=a0OsrIdYSR6le93YnpJijw">open.spotify.com/episode/0&hellip;</a></p>
+
+		</div>
+	  </div>
+	
+	  <div class="h-entry">
+		
+
+		<a href="https://sajilicious.micro.blog/2025/02/16/informative-video-listing-the-events.html" class="u-url"><time class="dt-published" datetime="2025-02-16 06:34:33 &#43;1000">Feb 16, 2025</time></a>
+
+		<div class="e-content">
+			 <p>Informative video listing the events that shaped Trump&rsquo;s idea to acquire Palestinian-occupied territories for American real estate developments #gaza #westbank</p>
+<p><a href="https://youtu.be/DdUGdSEXkQU?si=lgPUu0tovHUPBdEs">youtu.be/DdUGdSEXk&hellip;</a></p>
+
+		</div>
+	  </div>
+	
+	  <div class="h-entry">
+		
+			<h1><a href="https://sajilicious.micro.blog/2025/02/15/domain-event-dispatching-using-the.html">Domain event dispatching using the outbox pattern with Entity Framework</a></h1>
+		
+
+		<a href="https://sajilicious.micro.blog/2025/02/15/domain-event-dispatching-using-the.html" class="u-url"><time class="dt-published" datetime="2025-02-15 02:33:16 &#43;1000">Feb 15, 2025</time></a>
+
+		<div class="e-content">
+			 <h2 id="what-is-domain-event-dispatching">What is domain event dispatching?</h2>
+<p>Domain event dispatching is a concept that related to <a href="https://martinfowler.com/bliki/DomainDrivenDesign.html">domain-driven design</a>, or DDD as it&rsquo;s also known.</p>
+<p>Having said that, event dispatching is central to any <a href="https://learn.microsoft.com/en-us/azure/architecture/guide/architecture-styles/event-driven">event-driven architecture</a>, which follows the <a href="https://learn.microsoft.com/en-us/azure/architecture/patterns/publisher-subscriber">publisher-subscriber pattern</a>.</p>
+<p>Now, I&rsquo;ve not actually read Eric Evans' seminal book on domain-driven design, <a href="https://www.amazon.com.au/Domain-Driven-Design-Tackling-Complexity-Software/dp/0321125215">Domain-driven Design: Tackling Complexity in the Heart of Software</a>, so I&rsquo;m unsure whether Evans suggests whether domain events should be published as part of the transaction that creates them, or have the event persisted with the change in application state and then later published using an <a href="https://codeopinion.com/outbox-pattern-reliably-save-state-publish-events">outbox pattern</a>.</p>
+<p>I prefer the outbox pattern for domain event dispatching because I don&rsquo;t think you want a scenario where data is persisted and an event is raised that has multiple subscribers, but one of the subscribers fails to execute, causing the whole transation to be rolled back.</p>
+<p>You then get an inconsistent scenario where certain event handlers have been handled, but the data that relates to those actions does not exist.  Why send a confirmation email for an account that wasn&rsquo;t successfully regsitered.</p>
+<p>Or, conversely, the transaction is not rolled back and one subscriber has failed to execute (including retries with back-off).</p>
+<p>The outbox pattern, keeps a record of whether the event has been dispatched or &ldquo;sent&rdquo;, behaving a bit like a service bus.</p>
+<p>In this blog post, I&rsquo;m going to explore how an application using <a href="https://learn.microsoft.com/en-us/aspnet/entity-framework">Entity Framework</a> as an ORM can use an outbox pattern to publish domain events that are persisted with the application data.</p>
+<p>The packages used will be Entity Framewok and I will leverage <code>INotification</code> in <a href="https://github.com/jbogard/MediatR">MediatR</a> to assist with the publisher-subscriber implementation.</p>
+<p>All of these code samples are taken from my <a href="https://github.com/TheMagnificent11/lewee">Lewee</a> project.</p>
+<h2 id="domain-event">Domain Event</h2>
+<p>Here&rsquo;s rough representation of a domain event.</p>
+<p>I&rsquo;ve included a <code>CorrelationId</code> property that I believe should be set to allow you to correlate the logs from the original transaction that persisted the <a href="https://martinfowler.com/bliki/DDD_Aggregate.html">aggregate root</a> and all the subsequent events that get handled as part of the dispatching.</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4"><code class="language-cs" data-lang="cs"><span style="color:#66d9ef">using</span> MediatR;
+
+
+<span style="color:#66d9ef">public</span> <span style="color:#66d9ef">interface</span> IDomainEvent : INotification
+{
+    Guid CorrelationId { <span style="color:#66d9ef">get</span>; }
+}
+</code></pre></div><p>And here&rsquo;s a sample implementation of an menu item being added to the table&rsquo;s order at a restaurant.</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4"><code class="language-cs" data-lang="cs"><span style="color:#66d9ef">public</span> <span style="color:#66d9ef">class</span> <span style="color:#a6e22e">MenuItemAddedToOrderDomainEvent</span> : IDomainEvent
+{
+    <span style="color:#66d9ef">public</span> MenuItemAddedToOrderDomainEvent(
+        Guid correlationId,
+        Guid tableId,
+        <span style="color:#66d9ef">int</span> tableNumber,
+        Guid orderId,
+        Guid menuItemId,
+        <span style="color:#66d9ef">decimal</span> price)
+    {
+        <span style="color:#66d9ef">this</span>.CorrelationId = correlationId;
+        <span style="color:#66d9ef">this</span>.TableId = tableId;
+        <span style="color:#66d9ef">this</span>.TableNumber = tableNumber;
+        <span style="color:#66d9ef">this</span>.OrderId = orderId;
+        <span style="color:#66d9ef">this</span>.MenuItemId = menuItemId;
+        <span style="color:#66d9ef">this</span>.Price = price;
+    }
+
+
+    <span style="color:#66d9ef">public</span> Guid CorrelationId { <span style="color:#66d9ef">get</span>; }
+    <span style="color:#66d9ef">public</span> Guid TableId { <span style="color:#66d9ef">get</span>; }
+    <span style="color:#66d9ef">public</span> <span style="color:#66d9ef">int</span> TableNumber { <span style="color:#66d9ef">get</span>; }
+    <span style="color:#66d9ef">public</span> Guid OrderId { <span style="color:#66d9ef">get</span>; }
+    <span style="color:#66d9ef">public</span> Guid MenuItemId { <span style="color:#66d9ef">get</span>; }
+    <span style="color:#66d9ef">public</span> <span style="color:#66d9ef">decimal</span> Price { <span style="color:#66d9ef">get</span>; }
+}
+</code></pre></div><h2 id="storing-domain-events">Storing Domain Events</h2>
+<h3 id="entity-framework-entity">Entity Framework Entity</h3>
+<p>Below is entity class used to store the details about a domain event after it related aggregate root has been persisted.</p>
+<p>Things to note, we are storing the domain event as JSON (<code>DomainEventJson</code>) and also storing the assembly name (<code>DomainEventAssemblyName</code>) and class name (<code>DomainEventClassName</code>) to allow us to deserialize the JSON back to the doamin event in the <code>ToDomainEvent</code> method.</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4"><code class="language-cs" data-lang="cs"><span style="color:#66d9ef">using</span> System.Reflection;
+<span style="color:#66d9ef">using</span> System.Text.Json;
+
+
+<span style="color:#66d9ef">public</span> <span style="color:#66d9ef">class</span> <span style="color:#a6e22e">DomainEventReference</span>
+{
+    <span style="color:#66d9ef">public</span> DomainEventReference(DomainEvent domainEvent)
+    {
+        <span style="color:#66d9ef">this</span>.Id = Guid.NewGuid();
+        <span style="color:#66d9ef">this</span>.DomainEventAssemblyName = assemblyName;
+        <span style="color:#66d9ef">this</span>.DomainEventClassName = fullClassName;
+        <span style="color:#66d9ef">this</span>.DomainEventJson = JsonSerializer.Serialize(domainEvent, domainEventType);
+        <span style="color:#66d9ef">this</span>.PersistedAt = DateTime.UtcNow;
+        <span style="color:#66d9ef">this</span>.Dispatched = <span style="color:#66d9ef">false</span>;
+    }
+
+
+    <span style="color:#75715e">// EF constructor
+</span><span style="color:#75715e"></span>    <span style="color:#66d9ef">private</span> DomainEventReference()
+    {
+        <span style="color:#66d9ef">this</span>.DomainEventAssemblyName = <span style="color:#66d9ef">string</span>.Empty;
+        <span style="color:#66d9ef">this</span>.DomainEventClassName = <span style="color:#66d9ef">string</span>.Empty;
+        <span style="color:#66d9ef">this</span>.DomainEventJson = <span style="color:#e6db74">&#34;{}&#34;</span>;
+        <span style="color:#66d9ef">this</span>.PersistedAt = DateTime.UtcNow;
+        <span style="color:#66d9ef">this</span>.Dispatched = <span style="color:#66d9ef">false</span>;
+    }
+
+
+    <span style="color:#66d9ef">public</span> Guid Id { <span style="color:#66d9ef">get</span>; <span style="color:#66d9ef">protected</span> <span style="color:#66d9ef">set</span>; }
+    <span style="color:#66d9ef">public</span> <span style="color:#66d9ef">string</span> DomainEventAssemblyName { <span style="color:#66d9ef">get</span>; <span style="color:#66d9ef">protected</span> <span style="color:#66d9ef">set</span>; }
+    <span style="color:#66d9ef">public</span> <span style="color:#66d9ef">string</span> DomainEventClassName { <span style="color:#66d9ef">get</span>; <span style="color:#66d9ef">protected</span> <span style="color:#66d9ef">set</span>; }
+    <span style="color:#66d9ef">public</span> <span style="color:#66d9ef">string</span> DomainEventJson { <span style="color:#66d9ef">get</span>; <span style="color:#66d9ef">protected</span> <span style="color:#66d9ef">set</span>; }
+    <span style="color:#66d9ef">public</span> <span style="color:#66d9ef">bool</span> Dispatched { <span style="color:#66d9ef">get</span>; <span style="color:#66d9ef">protected</span> <span style="color:#66d9ef">set</span>; }
+    <span style="color:#66d9ef">public</span> DateTime PersistedAt { <span style="color:#66d9ef">get</span>; <span style="color:#66d9ef">protected</span> <span style="color:#66d9ef">set</span>; }
+    <span style="color:#66d9ef">public</span> DateTime? DispatchedAt { <span style="color:#66d9ef">get</span>; <span style="color:#66d9ef">protected</span> <span style="color:#66d9ef">set</span>; }
+
+
+    <span style="color:#66d9ef">public</span> DomainEvent? ToDomainEvent()
+    {
+        <span style="color:#66d9ef">if</span> (<span style="color:#66d9ef">string</span>.IsNullOrWhiteSpace(<span style="color:#66d9ef">this</span>.DomainEventJson))
+        {
+            <span style="color:#66d9ef">return</span> <span style="color:#66d9ef">null</span>;
+        }
+
+
+        <span style="color:#66d9ef">var</span> assembly = Assembly.Load(<span style="color:#66d9ef">this</span>.DomainEventAssemblyName);
+        <span style="color:#66d9ef">var</span> targetType = assembly.GetType(<span style="color:#66d9ef">this</span>.DomainEventClassName);
+
+
+        <span style="color:#66d9ef">if</span> (targetType == <span style="color:#66d9ef">null</span>)
+        {
+            <span style="color:#66d9ef">return</span> <span style="color:#66d9ef">null</span>;
+        }
+
+
+        <span style="color:#66d9ef">var</span> objDomainEvent = Deserialize(<span style="color:#66d9ef">this</span>.DomainEventJson, targetType);
+        <span style="color:#66d9ef">if</span> (objDomainEvent <span style="color:#66d9ef">is</span> not DomainEvent domainEvent)
+        {
+            <span style="color:#66d9ef">return</span> <span style="color:#66d9ef">null</span>;
+        }
+
+
+        domainEvent.UserId = <span style="color:#66d9ef">this</span>.UserId;
+
+
+        <span style="color:#66d9ef">return</span> domainEvent;
+
+
+        <span style="color:#66d9ef">static</span> <span style="color:#66d9ef">object?</span> Deserialize(<span style="color:#66d9ef">string</span> json, Type type)
+        {
+            <span style="color:#66d9ef">try</span>
+            {
+                <span style="color:#66d9ef">return</span> JsonSerializer.Deserialize(json, type);
+            }
+            <span style="color:#66d9ef">catch</span>
+            {
+                <span style="color:#66d9ef">return</span> <span style="color:#66d9ef">null</span>;
+            }
+        }
+    }
+
+
+    <span style="color:#66d9ef">public</span> <span style="color:#66d9ef">void</span> Dispatch()
+    {
+        <span style="color:#66d9ef">this</span>.Dispatched = <span style="color:#66d9ef">true</span>;
+        <span style="color:#66d9ef">this</span>.DispatchedAt = DateTime.UtcNow;
+    }
+}
+</code></pre></div><p>And here&rsquo;s how we&rsquo;ve configured the underlying database table.</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4"><code class="language-cs" data-lang="cs"><span style="color:#66d9ef">using</span> Microsoft.EntityFrameworkCore;
+<span style="color:#66d9ef">using</span> Microsoft.EntityFrameworkCore.Metadata.Builders;
+
+
+<span style="color:#66d9ef">public</span> <span style="color:#66d9ef">class</span> <span style="color:#a6e22e">DomainEventReferenceConfiguration</span> : IEntityTypeConfiguration&lt;DomainEventReference&gt;
+{
+    <span style="color:#66d9ef">public</span> <span style="color:#66d9ef">void</span> Configure(EntityTypeBuilder&lt;DomainEventReference&gt; builder)
+    {
+        builder.HasKey(x =&gt; x.Id);
+
+
+        builder.Property(x =&gt; x.DomainEventAssemblyName)
+            .HasMaxLength(<span style="color:#ae81ff">255</span>)
+            .IsRequired();
+
+
+        builder.Property(x =&gt; x.DomainEventClassName)
+            .HasMaxLength(<span style="color:#ae81ff">255</span>)
+            .IsRequired();
+
+
+        builder.Property(x =&gt; x.DomainEventJson)
+            .HasMaxLength(<span style="color:#ae81ff">8000</span>)
+            .IsRequired();
+
+
+        builder.Property(x =&gt; x.Dispatched)
+            .IsRequired();
+
+
+        builder.Property(x =&gt; x.PersistedAt)
+            .IsRequired();
+
+
+        builder.Property(x =&gt; x.DispatchedAt)
+            .IsRequired(<span style="color:#66d9ef">false</span>);
+
+
+        builder.Property(x =&gt; x.UserId)
+            .HasMaxLength(<span style="color:#ae81ff">50</span>);
+
+
+        builder.HasIndex(
+            nameof(DomainEventReference.Dispatched),
+            nameof(DomainEventReference.PersistedAt));
+    }
+}
+</code></pre></div><h3 id="how-the-aggregate-root-stores-the-domain-event">How the aggregate root stores the domain event</h3>
+<p>The aggregate root needs a collection of domain events on it.</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4"><code class="language-cs" data-lang="cs"><span style="color:#66d9ef">public</span> <span style="color:#66d9ef">class</span> <span style="color:#a6e22e">DomainEventsCollection</span>
+{
+    <span style="color:#66d9ef">private</span> <span style="color:#66d9ef">readonly</span> List&lt;DomainEvent&gt; domainEvents = <span style="color:#66d9ef">new</span>();
+    <span style="color:#66d9ef">private</span> <span style="color:#66d9ef">readonly</span> <span style="color:#66d9ef">object</span> syncLock = <span style="color:#66d9ef">new</span>();
+
+
+    <span style="color:#66d9ef">public</span> <span style="color:#66d9ef">void</span> Raise&lt;T&gt;(T domainEvent)
+        <span style="color:#66d9ef">where</span> T : DomainEvent
+    {
+        <span style="color:#66d9ef">lock</span> (<span style="color:#66d9ef">this</span>.syncLock)
+        {
+            <span style="color:#66d9ef">this</span>.domainEvents.Add(domainEvent);
+        }
+    }
+
+
+    <span style="color:#66d9ef">public</span> DomainEvent[] GetAndClear()
+    {
+        <span style="color:#66d9ef">lock</span> (<span style="color:#66d9ef">this</span>.syncLock)
+        {
+            <span style="color:#66d9ef">var</span> events = <span style="color:#66d9ef">this</span>.domainEvents.ToArray();
+            <span style="color:#66d9ef">this</span>.domainEvents.Clear();
+
+
+            <span style="color:#66d9ef">return</span> events;
+        }
+    }
+}
+</code></pre></div><div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4"><code class="language-cs" data-lang="cs"><span style="color:#66d9ef">public</span> <span style="color:#66d9ef">abstract</span> <span style="color:#66d9ef">class</span> <span style="color:#a6e22e">AggregateRoot</span> : Entity
+{
+    <span style="color:#66d9ef">protected</span> AggregateRoot()
+        : <span style="color:#66d9ef">base</span>(Guid.NewGuid())
+    {
+    }
+
+
+    <span style="color:#66d9ef">protected</span> AggregateRoot(Guid id)
+        : <span style="color:#66d9ef">base</span>(id)
+    {
+    }
+
+
+    <span style="color:#66d9ef">public</span> DomainEventsCollection DomainEvents { <span style="color:#66d9ef">get</span>; } = <span style="color:#66d9ef">new</span> DomainEventsCollection();
+}
+</code></pre></div><p>And here&rsquo;s a sample implementation of an aggregate root &ldquo;raising&rdquo; a domain event.</p>
+<p>In this example, a menu item is being added to the order of a table at a restaurant.</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4"><code class="language-cs" data-lang="cs"><span style="color:#66d9ef">public</span> <span style="color:#66d9ef">class</span> <span style="color:#a6e22e">Table</span> : AggregateRoot
+{
+    <span style="color:#66d9ef">private</span> <span style="color:#66d9ef">readonly</span> List&lt;Order&gt; orders = <span style="color:#66d9ef">new</span>();
+
+
+    <span style="color:#66d9ef">public</span> Table(Guid id, <span style="color:#66d9ef">int</span> tableNumber)
+        : <span style="color:#66d9ef">base</span>(id)
+    {
+        <span style="color:#66d9ef">this</span>.TableNumber = tableNumber;
+    }
+
+
+    <span style="color:#66d9ef">public</span> Order? CurrentOrder =&gt; <span style="color:#66d9ef">this</span>.orders
+        .Where(x =&gt; x.OrderStatusId != OrderStatus.Paid)
+        .Where(x =&gt; !x.IsDeleted)
+        .OrderByDescending(x =&gt; x.CreatedAtUtc)
+        .FirstOrDefault();
+
+
+    <span style="color:#66d9ef">public</span> <span style="color:#66d9ef">int</span> TableNumber { <span style="color:#66d9ef">get</span>; <span style="color:#66d9ef">protected</span> <span style="color:#66d9ef">set</span>; }
+    <span style="color:#66d9ef">public</span> <span style="color:#66d9ef">bool</span> IsInUse { <span style="color:#66d9ef">get</span>; <span style="color:#66d9ef">protected</span> <span style="color:#66d9ef">set</span>; }
+    <span style="color:#66d9ef">public</span> IReadOnlyCollection&lt;Order&gt; Orders =&gt; <span style="color:#66d9ef">this</span>.orders;
+
+
+    <span style="color:#66d9ef">public</span> <span style="color:#66d9ef">void</span> OrderMenuItem(MenuItem menuItem, Guid correlationId)
+    {
+        <span style="color:#66d9ef">if</span> (!<span style="color:#66d9ef">this</span>.IsInUse || <span style="color:#66d9ef">this</span>.CurrentOrder == <span style="color:#66d9ef">null</span>)
+        {
+            <span style="color:#66d9ef">throw</span> <span style="color:#66d9ef">new</span> DomainException(ErrorMessages.CannotOrderIfTableNotInUse);
+        }
+
+
+        <span style="color:#66d9ef">this</span>.CurrentOrder.AddItem(menuItem);
+
+
+        <span style="color:#66d9ef">this</span>.DomainEvents.Raise(<span style="color:#66d9ef">new</span> MenuItemAddedToOrderDomainEvent(
+            correlationId,
+            <span style="color:#66d9ef">this</span>.Id,
+            <span style="color:#66d9ef">this</span>.TableNumber,
+            <span style="color:#66d9ef">this</span>.CurrentOrder.Id,
+            menuItem.Id,
+            menuItem.Price));
+    }
+
+
+    <span style="color:#66d9ef">public</span> <span style="color:#66d9ef">static</span> <span style="color:#66d9ef">class</span> <span style="color:#a6e22e">ErrorMessages</span>
+    {
+        <span style="color:#66d9ef">public</span> <span style="color:#66d9ef">const</span> <span style="color:#66d9ef">string</span> CannotOrderIfTableNotInUse = <span style="color:#e6db74">&#34;Cannot order items if table is not in use&#34;</span>;
+    }
+}
+</code></pre></div><h3 id="how-the-dbcontext-stores-the-domain-event">How the DbContext stores the domain event</h3>
+<p>We are going to use a <a href="https://learn.microsoft.com/en-us/dotnet/api/microsoft.entityframeworkcore.diagnostics.savechangesinterceptor">SaveChangesInterceptor</a> to find the domain events added to our aggregate roots and add them as <code>DomainEventReference</code> instances before &ldquo;save changes&rdquo; executes.</p>
+<p>To do that, we need to be able easily identify the <code>DbSet</code> for our <code>DomainEventReference</code> entities.</p>
+<p>So, we&rsquo;ve created an <code>IApplicationDbContext</code> interface that we can add to our Entity Framework <code>DbContext</code>.</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4"><code class="language-cs" data-lang="cs"><span style="color:#66d9ef">public</span> <span style="color:#66d9ef">interface</span> IApplicationDbContext
+{
+    DbSet&lt;DomainEventReference&gt;? DomainEventReferences { <span style="color:#66d9ef">get</span>; }
+}
+</code></pre></div><p>And here&rsquo;s the interceptor that find the domain events on the aggregate roots and stores them in the <code>DbContext</code>.</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4"><code class="language-cs" data-lang="cs"><span style="color:#66d9ef">using</span> Microsoft.EntityFrameworkCore;
+<span style="color:#66d9ef">using</span> Microsoft.EntityFrameworkCore.ChangeTracking;
+<span style="color:#66d9ef">using</span> Microsoft.EntityFrameworkCore.Diagnostics;
+
+
+<span style="color:#66d9ef">public</span> <span style="color:#66d9ef">class</span> <span style="color:#a6e22e">DomainEventSaveChangesInterceptor</span>&lt;TContext&gt; : SaveChangesInterceptor
+    <span style="color:#66d9ef">where</span> TContext : DbContext, IApplicationDbContext
+{
+    <span style="color:#66d9ef">public</span> <span style="color:#66d9ef">override</span> InterceptionResult&lt;<span style="color:#66d9ef">int</span>&gt; SavingChanges(
+        DbContextEventData eventData,
+        InterceptionResult&lt;<span style="color:#66d9ef">int</span>&gt; result)
+    {
+        <span style="color:#66d9ef">this</span>.StoreDomainEvents(eventData.Context);
+
+
+        <span style="color:#66d9ef">return</span> <span style="color:#66d9ef">base</span>.SavingChanges(eventData, result);
+    }
+
+
+    <span style="color:#66d9ef">public</span> <span style="color:#66d9ef">override</span> ValueTask&lt;InterceptionResult&lt;<span style="color:#66d9ef">int</span>&gt;&gt; SavingChangesAsync(
+        DbContextEventData eventData,
+        InterceptionResult&lt;<span style="color:#66d9ef">int</span>&gt; result,
+        CancellationToken cancellationToken = <span style="color:#66d9ef">default</span>)
+    {
+        <span style="color:#66d9ef">this</span>.StoreDomainEvents(eventData.Context);
+
+
+        <span style="color:#66d9ef">return</span> <span style="color:#66d9ef">base</span>.SavingChangesAsync(eventData, result, cancellationToken);
+    }
+
+
+    <span style="color:#66d9ef">private</span> <span style="color:#66d9ef">void</span> StoreDomainEvents(DbContext? context)
+    {
+        <span style="color:#66d9ef">if</span> (context == <span style="color:#66d9ef">null</span> || context <span style="color:#66d9ef">is</span> not TContext)
+        {
+            <span style="color:#66d9ef">return</span>;
+        }
+
+
+        <span style="color:#66d9ef">foreach</span> (<span style="color:#66d9ef">var</span> entry <span style="color:#66d9ef">in</span> context.ChangeTracker.Entries().ToList())
+        {
+            <span style="color:#66d9ef">this</span>.StoreDomainEventsForEntry((TContext)context, entry);
+        }
+    }
+
+
+    <span style="color:#66d9ef">private</span> <span style="color:#66d9ef">void</span> StoreDomainEventsForEntry(TContext context, EntityEntry entry)
+    {
+        <span style="color:#66d9ef">if</span> (entry.Entity <span style="color:#66d9ef">is</span> not AggregateRoot aggregateRootEntity)
+        {
+            <span style="color:#66d9ef">return</span>;
+        }
+
+
+        <span style="color:#66d9ef">var</span> events = aggregateRootEntity.DomainEvents.GetAndClear();
+
+
+        <span style="color:#66d9ef">foreach</span> (<span style="color:#66d9ef">var</span> domainEvent <span style="color:#66d9ef">in</span> events)
+        {
+            <span style="color:#66d9ef">if</span> (domainEvent == <span style="color:#66d9ef">null</span>)
+            {
+                <span style="color:#66d9ef">continue</span>;
+            }
+
+
+            <span style="color:#66d9ef">var</span> reference = <span style="color:#66d9ef">new</span> DomainEventReference(domainEvent);
+
+
+            context.DomainEventReferences?.Add(reference);
+        }
+    }
+}
+</code></pre></div><p>Finally, here&rsquo;s an abstract <code>DbContext</code> implementation that exposes the <code>DomainEventReference</code> <code>DbSet</code> and adds the <code>DomainEventSaveChangesInterceptor</code>.</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4"><code class="language-cs" data-lang="cs"><span style="color:#66d9ef">using</span> Microsoft.EntityFrameworkCore;
+
+
+<span style="color:#66d9ef">public</span> <span style="color:#66d9ef">abstract</span> <span style="color:#66d9ef">class</span> <span style="color:#a6e22e">ApplicationDbContext</span>&lt;TContext&gt; : DbContext, IApplicationDbContext
+    <span style="color:#66d9ef">where</span> TContext : DbContext, IApplicationDbContext
+{
+    <span style="color:#66d9ef">protected</span> ApplicationDbContext(DbContextOptions&lt;TContext&gt; options)
+        : <span style="color:#66d9ef">base</span>(options)
+    {
+    }
+
+
+    <span style="color:#66d9ef">public</span> DbSet&lt;DomainEventReference&gt;? DomainEventReferences { <span style="color:#66d9ef">get</span>; <span style="color:#66d9ef">internal</span> <span style="color:#66d9ef">set</span>; }
+
+
+    <span style="color:#66d9ef">protected</span> <span style="color:#66d9ef">override</span> <span style="color:#66d9ef">void</span> OnModelCreating(ModelBuilder modelBuilder)
+    {
+        <span style="color:#66d9ef">base</span>.OnModelCreating(modelBuilder);
+
+
+        modelBuilder.ApplyConfiguration(<span style="color:#66d9ef">new</span> DomainEventReferenceConfiguration());
+
+
+        <span style="color:#66d9ef">this</span>.ConfigureDatabaseModel(modelBuilder);
+    }
+
+
+    <span style="color:#66d9ef">protected</span> <span style="color:#66d9ef">override</span> <span style="color:#66d9ef">void</span> OnConfiguring(DbContextOptionsBuilder optionsBuilder)
+    {
+        <span style="color:#66d9ef">base</span>.OnConfiguring(optionsBuilder);
+
+
+        optionsBuilder.AddInterceptors(<span style="color:#66d9ef">new</span> DomainEventSaveChangesInterceptor&lt;TContext&gt;());
+    }
+
+
+    <span style="color:#66d9ef">protected</span> <span style="color:#66d9ef">abstract</span> <span style="color:#66d9ef">void</span> ConfigureDatabaseModel(ModelBuilder modelBuilder);
+}
+</code></pre></div><h2 id="dispatching-domain-events">Dispatching Domain Events</h2>
+<p>The code below reads from the database table for the <code>DomainEventReference</code> entity and dispatches them in batches of 50.</p>
+<p>For event row, it deserializes the JSON to the original <code>IDomainEvent</code> and because <code>IDomainEvent</code> implements <code>INotification</code> from <code>MediatR</code>, you can use the <code>Publish</code> to achieve the publisher-subscriber pattern; there can be multiple notification handlers for each event.  Conversely, if there are not notification handlers, <code>MediatR</code> will handle this for us and return successfully.</p>
+<p>The domain event does not get marked as &ldquo;dispatched&rdquo; in the database unless all dispatching succeeds.</p>
+<p>There is a downside here because you could have three notification handlers for an event, two could succeed and one could fail, causing the event does not get marked as dispatched.</p>
+<p>Any process that tries to re-dispatch will attempt all three handlers again, so you could get duplication of certain handlers.</p>
+<p>However, I think this is still better than the other scenario I outlined earlier.</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4"><code class="language-cs" data-lang="cs"><span style="color:#66d9ef">using</span> MediatR;
+<span style="color:#66d9ef">using</span> Microsoft.EntityFrameworkCore;
+<span style="color:#66d9ef">using</span> Serilog;
+
+
+<span style="color:#66d9ef">public</span> <span style="color:#66d9ef">class</span> <span style="color:#a6e22e">DomainEventDispatcher</span>&lt;TContext&gt;
+    <span style="color:#66d9ef">where</span> TContext : DbContext, IApplicationDbContext
+{
+    <span style="color:#66d9ef">private</span> <span style="color:#66d9ef">const</span> <span style="color:#66d9ef">int</span> BatchSize = <span style="color:#ae81ff">50</span>;
+
+
+    <span style="color:#66d9ef">private</span> <span style="color:#66d9ef">readonly</span> IDbContextFactory&lt;TContext&gt; dbContextFactory;
+    <span style="color:#66d9ef">private</span> <span style="color:#66d9ef">readonly</span> IMediator mediator;
+    <span style="color:#66d9ef">private</span> <span style="color:#66d9ef">readonly</span> ILogger logger;
+
+
+    <span style="color:#66d9ef">public</span> DomainEventDispatcher(
+        IDbContextFactory&lt;TContext&gt; dbContextFactory,
+        IMediator mediator,
+        ILogger logger)
+    {
+        <span style="color:#66d9ef">this</span>.dbContextFactory = dbContextFactory;
+        <span style="color:#66d9ef">this</span>.mediator = mediator;
+        <span style="color:#66d9ef">this</span>.logger = logger.ForContext&lt;DomainEventDispatcher&lt;TContext&gt;&gt;();
+    }
+
+
+    <span style="color:#66d9ef">public</span> <span style="color:#66d9ef">async</span> Task DispatchEvents(CancellationToken cancellationToken)
+    {
+        <span style="color:#66d9ef">var</span> eventsToDispatch = <span style="color:#66d9ef">await</span> <span style="color:#66d9ef">this</span>.ThereAreEventsToDispatch(cancellationToken);
+
+
+        <span style="color:#66d9ef">while</span> (eventsToDispatch &amp;&amp; !cancellationToken.IsCancellationRequested)
+        {
+            <span style="color:#66d9ef">await</span> <span style="color:#66d9ef">this</span>.DispatchBatch(cancellationToken);
+
+
+            eventsToDispatch = <span style="color:#66d9ef">await</span> <span style="color:#66d9ef">this</span>.ThereAreEventsToDispatch(cancellationToken);
+        }
+    }
+
+
+    <span style="color:#66d9ef">private</span> <span style="color:#66d9ef">async</span> Task&lt;<span style="color:#66d9ef">bool</span>&gt; ThereAreEventsToDispatch(CancellationToken token)
+    {
+        <span style="color:#66d9ef">using</span> (<span style="color:#66d9ef">var</span> scope = <span style="color:#66d9ef">this</span>.dbContextFactory.CreateDbContext())
+        {
+            <span style="color:#66d9ef">var</span> dbSet = scope.Set&lt;DomainEventReference&gt;();
+
+
+            <span style="color:#66d9ef">if</span> (dbSet == <span style="color:#66d9ef">null</span>)
+            {
+                <span style="color:#66d9ef">return</span> <span style="color:#66d9ef">false</span>;
+            }
+
+
+            <span style="color:#66d9ef">return</span> <span style="color:#66d9ef">await</span> dbSet
+                .Where(x =&gt; !x.Dispatched)
+                .OrderBy(x =&gt; x.PersistedAt)
+                .AnyAsync(token);
+        }
+    }
+
+
+    <span style="color:#66d9ef">private</span> <span style="color:#66d9ef">async</span> Task DispatchBatch(CancellationToken token)
+    {
+        <span style="color:#66d9ef">using</span> (<span style="color:#66d9ef">var</span> scope = <span style="color:#66d9ef">this</span>.dbContextFactory.CreateDbContext())
+        {
+            <span style="color:#66d9ef">var</span> dbSet = scope.Set&lt;DomainEventReference&gt;();
+            <span style="color:#66d9ef">if</span> (dbSet == <span style="color:#66d9ef">null</span>)
+            {
+                <span style="color:#66d9ef">return</span>;
+            }
+
+
+            <span style="color:#66d9ef">var</span> events = <span style="color:#66d9ef">await</span> dbSet
+                .Where(x =&gt; !x.Dispatched)
+                .OrderBy(x =&gt; x.PersistedAt)
+                .Take(BatchSize)
+                .ToArrayAsync(token);
+
+
+            <span style="color:#66d9ef">var</span> domainEvents = <span style="color:#66d9ef">new</span> List&lt;DomainEvent&gt;();
+
+
+            <span style="color:#66d9ef">foreach</span> (<span style="color:#66d9ef">var</span> domainEventReference <span style="color:#66d9ef">in</span> events)
+            {
+                domainEventReference.Dispatch();
+
+
+                <span style="color:#66d9ef">var</span> domainEvent = domainEventReference.ToDomainEvent();
+
+
+                <span style="color:#66d9ef">if</span> (domainEvent == <span style="color:#66d9ef">null</span>)
+                {
+                    <span style="color:#66d9ef">this</span>.logger.Warning(
+                        <span style="color:#e6db74">&#34;Could not deserialize DomainEventReference {Id}&#34;</span>,
+                        domainEventReference.Id);
+                }
+                <span style="color:#66d9ef">else</span>
+                {
+                    domainEvents.Add(domainEvent);
+                }
+            }
+
+
+            <span style="color:#66d9ef">if</span> (domainEvents.Any())
+            {
+                <span style="color:#66d9ef">foreach</span> (<span style="color:#66d9ef">var</span> domainEvent <span style="color:#66d9ef">in</span> domainEvents)
+                {
+                    <span style="color:#66d9ef">await</span> <span style="color:#66d9ef">this</span>.mediator.Publish(domainEvent, token);
+                }
+            }
+
+
+            <span style="color:#66d9ef">await</span> scope.SaveChangesAsync(token);
+        }
+    }
+}
+</code></pre></div><p>So the code above does the dispatching, but what triggers the dispatching?</p>
+<p>As far as I know, there is nothing similar to the <code>SaveChangesInterceptor</code> that executes after a successful save changes.</p>
+<p>So, we&rsquo;ve decided to use a background service.</p>
+<p>In the code below, we are expecting our <code>DomainEventDispatcher</code> to dispatch events every 2.5 seconds.</p>
+<p>So, any events that failed to dispatch will be retried after 2.5 seconds.</p>
+<p><code>DomainEventReference</code> does not currently have a &ldquo;retry count&rdquo; or a &ldquo;failed&rdquo; property and that is definitely an improvement that could be added; fail if retried 10 times.</p>
+<p>Under this solution, we will keep retrying and failed events will be attempted before new events, potentially causing a performance issue if failed events build up.</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4"><code class="language-cs" data-lang="cs"><span style="color:#66d9ef">using</span> Microsoft.EntityFrameworkCore;
+<span style="color:#66d9ef">using</span> Microsoft.Extensions.Hosting;
+
+
+<span style="color:#66d9ef">namespace</span> Lewee.Infrastructure.Data;
+
+
+<span style="color:#66d9ef">public</span> <span style="color:#66d9ef">class</span> <span style="color:#a6e22e">DomainEventDispatcherService</span>&lt;TContext&gt; : BackgroundService
+    <span style="color:#66d9ef">where</span> TContext : DbContext, IApplicationDbContext
+{
+    <span style="color:#66d9ef">public</span> DomainEventDispatcherService(DomainEventDispatcher&lt;TContext&gt; domainEventDispatcher)
+    {
+        <span style="color:#66d9ef">this</span>.DomainEventDispatcher = domainEventDispatcher;
+    }
+
+
+    <span style="color:#66d9ef">public</span> DomainEventDispatcher&lt;TContext&gt; DomainEventDispatcher { <span style="color:#66d9ef">get</span>; }
+
+
+    <span style="color:#66d9ef">protected</span> <span style="color:#66d9ef">override</span> <span style="color:#66d9ef">async</span> Task ExecuteAsync(CancellationToken stoppingToken)
+    {
+        <span style="color:#66d9ef">while</span> (!stoppingToken.IsCancellationRequested)
+        {
+            <span style="color:#66d9ef">await</span> <span style="color:#66d9ef">this</span>.DomainEventDispatcher.DispatchEvents(stoppingToken);
+
+
+            <span style="color:#66d9ef">await</span> Task.Delay(<span style="color:#ae81ff">2500</span>, stoppingToken);
+        }
+    }
+}
+</code></pre></div><p>There are definitely better ways to achieve this.</p>
+<p>You could override save changes on your <code>DbContext</code> to trigger your domain event dispatcher and later you use some sort of retry policy if any events fails to dispatch.</p>
+<p>That would be more efficient, but more complicated and harder to implement.</p>
+<h2 id="dependency-injection-configuration">Dependency Injection Configuration</h2>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4"><code class="language-cs" data-lang="cs"><span style="color:#66d9ef">using</span> Microsoft.EntityFrameworkCore;
+<span style="color:#66d9ef">using</span> Microsoft.Extensions.DependencyInjection;
+
+
+<span style="color:#66d9ef">public</span> <span style="color:#66d9ef">static</span> <span style="color:#66d9ef">class</span> <span style="color:#a6e22e">ApplicationDbContextServiceCollectionExtensions</span>
+{
+    <span style="color:#66d9ef">public</span> <span style="color:#66d9ef">static</span> IServiceCollection ConfigureDatabase&lt;T&gt;(
+        <span style="color:#66d9ef">this</span> IServiceCollection services,
+        <span style="color:#66d9ef">string</span> connectionString)
+        <span style="color:#66d9ef">where</span> T : ApplicationDbContext&lt;T&gt;
+    {
+        services.AddDbContextFactory&lt;T&gt;(options =&gt; options.UseSqlServer(connectionString));
+        services.AddScoped&lt;T&gt;();
+
+
+        services.AddSingleton&lt;DomainEventDispatcher&lt;T&gt;&gt;();
+        services.AddHostedService&lt;DomainEventDispatcherService&lt;T&gt;&gt;();
+
+
+        <span style="color:#66d9ef">return</span> services;
+    }
+}
+</code></pre></div><h2 id="this-is-a-lot-of-boilerplate">This is a lot of boilerplate</h2>
+<p>This seems like a lot of code to achieve what I&rsquo;d expect to be relatively straight-forward.</p>
+<p>Given this is fairly common pattern and that DDD is used by a lot in software development, you&rsquo;d expect that there are frameworks that do this for you.</p>
+<p>That&rsquo;s what I&rsquo;ve tried to achieve with <a href="https://github.com/TheMagnificent11/lewee">Lewee</a>.</p>
+<p>However, there&rsquo;s definitely a better way.</p>
+<p>In a future blog post, I&rsquo;d like to explore how to dispatch to a message broker, probably <code>RabbitMQ</code> via <a href="https://masstransit.io">MassTransit</a>, instead of using <code>Mediatr</code> notifications.  I feel like this is more flexible as any service within your distributed application can handle your domain events. not just the service that dispatches it.</p>
+
+		</div>
+	  </div>
+	
+
+</div>
+
+
+    
+    
+
+  </body>
+
+</html>
