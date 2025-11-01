@@ -18,7 +18,7 @@ collections:
 
 # Include/Exclude settings
 include:
-  - pages
+  - posts
 
 exclude:
   - .git
@@ -35,7 +35,7 @@ defaults:
     values:
       layout: "post"
   - scope:
-      path: "pages"
+      path: "posts"
     values:
       layout: "page"
 
