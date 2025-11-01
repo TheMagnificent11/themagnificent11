@@ -1,3 +1,11 @@
+---
+layout: page
+title: "Domain event dispatching using the outbox pattern with Entity Framework"
+date: 2025-04-06
+author: Saji Weerasingham
+categories: [domain-driven-design, entity-framework, outbox-pattern]
+---
+
 # Domain event dispatching using the outbox pattern with Entity Framework
 
 ## What is domain event dispatching?

@@ -1,3 +1,11 @@
+---
+layout: post
+title: "Reliable Domain Event Dispatching with Outbox Pattern and EF Core Interceptors"
+date: 2025-04-06
+author: Saji Weerasingham
+categories: [domain-driven-design, entity-framework, outbox-pattern, ef-core-interceptors]
+---
+
 # Reliable Domain Event Dispatching with Outbox Pattern and EF Core Interceptors
 
 ---
