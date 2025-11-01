@@ -76,7 +76,7 @@ EF Core **interceptors** are classes that "plug into" and can **inspect, modify,
 | `IDbCommandInterceptor`      | Executing database commands, query rewrites      |
 | `IDbConnectionInterceptor`   | Opening/closing database connections             |
 
-**Note:** `ISaveChangesInterceptor` is the interface; `SaveChangesInterceptor` is the base class with no-ops implemented for convenience. Similar rules apply for transaction and command interceptors..
+**Note:** `ISaveChangesInterceptor` is the interface; `SaveChangesInterceptor` is the base class with no-ops implemented for convenience. Similar rules apply for transaction and command interceptors.
 
 ### 2.2 Why Use Interceptors for Domain Event Outbox?
 
