@@ -1,5 +1,5 @@
 ---
-layout: page
+layout: post
 title: "Domain event dispatching using the outbox pattern with Entity Framework"
 date: 2025-04-06
 author: Saji Weerasingham

@@ -50,7 +50,3 @@ Currently, I'm trying to get my head around [OpenTelementry.Net](https://github.
 {% for post in site.posts %}
 - [{{ post.title }}]({{ post.url | relative_url }}) - {{ post.date | date: "%B %d, %Y" }}
 {% endfor %}
-
-## Articles
-
-- [Domain event dispatching using the outbox pattern with Entity Framework](/posts/2025-04-06_outbox-domain-event-dispatching-with-ef.html)
