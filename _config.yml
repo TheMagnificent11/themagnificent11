@@ -19,7 +19,6 @@ collections:
 # Include/Exclude settings
 include:
   - pages
-  - blog-posts
 
 exclude:
   - .git
@@ -39,10 +38,6 @@ defaults:
       path: "pages"
     values:
       layout: "page"
-  - scope:
-      path: "blog-posts"
-    values:
-      layout: "post"
 
 # Plugins
 plugins:
