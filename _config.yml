@@ -1,0 +1,45 @@
+# Site settings
+title: TheMagnificent11's Blog
+description: A .Net engineer's thoughts on domain-driven design, observability, and software engineering
+author: Saji Weerasingham
+url: "https://themagnificent11.github.io"
+baseurl: ""
+
+# Build settings
+theme: minima
+markdown: kramdown
+permalink: /:year/:month/:day/:title/
+
+# Collections
+collections:
+  posts:
+    output: true
+    permalink: /blog/:year/:month/:day/:title/
+
+# Include/Exclude settings
+include:
+  - posts
+
+exclude:
+  - .git
+  - .github
+  - README.md
+  - Gemfile
+  - Gemfile.lock
+
+# Defaults
+defaults:
+  - scope:
+      path: ""
+      type: "posts"
+    values:
+      layout: "post"
+  - scope:
+      path: "posts"
+    values:
+      layout: "page"
+
+# Plugins
+plugins:
+  - jekyll-feed
+  - jekyll-seo-tag
