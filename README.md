@@ -1,4 +1,4 @@
-### Hi there 👋
+# Hi there 👋
 
 I'm a .Net engineer based in Brisbane, Australia.
 
@@ -20,7 +20,7 @@ My GitHub username, `TheMagnificent11`, is play on words with the old "The Magni
 
 My main software engineering interests include domain-driven design and observability.
 
-.Net Aspire looks interesting and I want to start using it in my personal projects.
+.Net Aspire looks interesting and I am enjoying playing-around with it.
 
 Currently, I'm trying to get my head around [OpenTelementry.Net](https://github.com/open-telemetry/opentelemetry-dotnet) and how to integrate it with Grafana and Loki.
 
@@ -30,7 +30,6 @@ Currently, I'm trying to get my head around [OpenTelementry.Net](https://github.
 - 🤔 I’m looking for help using .Net Aspire to deploy applications to Azure Container Apps while using Azure AD B2C for authentication and Azure Key Vault for secret management.
 - 💬 Ask me about domain-driven design or football (soccer).
 - 📫 How to reach me:
-  - [Micro.blog](https://sajilicious.micro.blog)
   - [Bluesky](https://bsky.app/profile/sajilicious.bsky.social)
   - [Mastodon](https://hachyderm.io/@sajilicious)
   - [LinkedIn](https://www.linkedin.com/in/saji-weerasingham/)
