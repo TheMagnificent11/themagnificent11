@@ -5,6 +5,12 @@ author: Saji Weerasingham
 url: "https://themagnificent11.github.io"
 baseurl: "/themagnificent11"
 
+# GitHub settings
+github:
+  repository_url: "https://github.com/TheMagnificent11/themagnificent11"
+  owner_url: "https://github.com/TheMagnificent11"
+  owner_name: "TheMagnificent11"
+
 # Build settings
 theme: jekyll-theme-midnight
 markdown: kramdown
