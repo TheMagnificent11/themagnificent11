@@ -537,7 +537,7 @@ Looking at the stated motivations and proposals from [Lewee issue #380], the imp
 
 **Reliable event dispatching in distributed .NET systems demands strong guarantees that domain events are captured and delivered only after the success of business transactions.** The **Outbox Pattern**, implemented via **EF Core interceptors** (`SaveChangesInterceptor` and `DbTransactionInterceptor`), is a proven design that ensures this reliability while preserving DDD purity, scalability, and system resilience. Modern messaging libraries (such as MassTransit) offer rich integration scaffolding atop EF outbox mechanisms, while straightforward custom implementations remain eminently viable.
 
-**Adopting this pattern unifies transactional consistency,* decouples logic, and protects against race conditions and message loss. With careful attention to dispatcher design, error handling, performance tuning, and testing, .NET applications achieve the robustness necessary for mission-critical event-driven architectures.**
+**Adopting this pattern unifies transactional consistency, decouples logic, and protects against race conditions and message loss. With careful attention to dispatcher design, error handling, performance tuning, and testing, .NET applications achieve the robustness necessary for mission-critical event-driven architectures.**
 
 ---
 
